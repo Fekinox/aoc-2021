@@ -13,7 +13,7 @@ val (numberList, bingoBoards) =
       end
 
     fun splitAtEmpty [] = ([],[])
-      | splitAtEmpty ("\n"::s) = ([],s)
+      | splitAtEmpty ("\n"::s) = ([],s,)
       | splitAtEmpty (x::s) =
       let
         val (a,b) = splitAtEmpty s

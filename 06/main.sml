@@ -18,7 +18,7 @@ val fishArray =
 
     val resultLine = Array.array (9,0)
 
-    fun addToResLine i = Array.update (resultLine, i, (Array.sub (resultLine, i)) + 1)
+    fun addToResLine i = ArrayHelper.mutate (resultLine, i, (fn j => j+1))
   in
     (((List.app addToResLine) o List.mapPartial Int.fromString) exploded; (Array.vector resultLine))
   end

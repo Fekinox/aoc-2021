@@ -1,40 +1,3 @@
-local
-  fun split [] = ([], [])
-    | split [x] = ([x], [])
-    | split (x::y::ys) = let val (A,B) = split ys in (x::A, y::B) end
-
-  fun merge cmp (L, []) = L
-    | merge cmp ([], R) = R
-    | merge cmp (l::L, r::R) =
-    (case cmp (l, r) of
-       LESS => l :: (merge cmp (L, r::R))
-     | _ => r :: (merge cmp (l::L, R)))
-in
-  fun mergesort cmp [] = []
-    | mergesort cmp [x] = [x]
-    | mergesort cmp L =
-    let
-      val (A, B) = split L
-    in
-      merge cmp (mergesort cmp A, mergesort cmp B)
-    end
-end
-
-fun collect cmp L =
-  let
-    val sorted = mergesort cmp L
-
-    fun collect' [] [] = []
-      | collect' S [] = S
-      | collect' [] (x::L) = collect' [[x]] L
-      | collect' ((h::x)::xs) (y::L) =
-        (case cmp (h, y) of
-           EQUAL => collect' ((y::h::x)::xs) L
-         | _ => collect' ([y]::(h::x)::xs) L)
-  in
-    collect' [] sorted
-  end
-
 val graph =
   let
     val lines = InputHelper.getInput "input"
@@ -49,7 +12,7 @@ val graph =
 
     val allPairs = List.concat (map getStringPairs lines)
 
-    val collected = collect (fn ((s1,_),(s2,_)) => String.compare (s1,s2)) allPairs
+    val collected = ListHelper.collect (fn ((s1,_),(s2,_)) => String.compare (s1,s2)) allPairs
 
     val cleaned = List.map (fn ((s,q)::ns) => (s, q::(map (fn (_,x) => x) ns))) collected
   in
@@ -65,52 +28,42 @@ fun neighbors G s =
     | SOME (_,ns) => ns)
   end
 
-val isBig = (List.all Char.isUpper) o String.explode
-val isSmall = (List.all Char.isLower) o String.explode
+fun isBig s = Char.isUpper (String.sub (s, 0))
+fun isSmall s = Char.isLower (String.sub (s, 0))
 
-val allPaths =
+fun allPaths maxRevisits =
   let
-    val paths = ref []
+    val paths = ref 0
+    (* imperative, yes, but it's way cleaner than threading a state variable
+       through all the functions *)
 
-    (* Do a DFS, keeping track of all the small caves we visit in a list *)
+    (* A cave is a valid neighbor to visit in the DFS if it's big or if we
+       haven't visited it already *)
     fun validNeighbor route s =
       (isBig s) orelse (not (List.exists (fn v => v = s) route))
 
-    fun dfs route "end" = paths := (List.rev ("end"::route) :: !paths)
-      | dfs route v =
+    (* If we hit the end halt immediately *)
+    fun dfs route revis "end" = paths := (!paths + 1)
+      | dfs route revis v =
       let
-        val nbors = List.filter (validNeighbor route) (neighbors graph v)
+        val nbors = (neighbors graph v)
+
+        (* If it's a valid neighbor, just visit it *)
+        (* Otherwise, it's some small cave we've visited already.
+           If we haven't hit the max limit of revisits and this
+           node isn't the start or the end, we may revisit it *)
+        fun tryNbor n =
+          if (validNeighbor route n)
+          then dfs (v::route) revis n
+          else
+            if (revis < maxRevisits andalso n <> "start" andalso n <> "end")
+            then dfs (v::route) (revis+1) n
+            else ()
       in
-        List.app (fn n => dfs (v::route) n) nbors
+        List.app tryNbor nbors
       end
 
-    val _ = dfs [] "start"
-  in
-    !paths
-  end
-
-val allPathsWithRevisit =
-  let
-    val paths = ref []
-
-    (* Do a DFS, keeping track of all the small caves we visit in a list *)
-    fun validNeighbor route s =
-      (isBig s) orelse (not (List.exists (fn v => v = s) route))
-
-    fun dfs route revisit "end" = paths := (List.rev ("end"::route) :: !paths)
-      | dfs route revisit v =
-      let
-        val nbors = List.filter (validNeighbor route) (neighbors graph v)
-        val revisits =
-          if revisit
-          then List.filter (fn x => (not (validNeighbor route x)) andalso x <> "start" andalso x <> "end") (neighbors graph v)
-          else []
-      in
-        (List.app (fn n => dfs (v::route) revisit n) nbors;
-        List.app (fn n => dfs (v::route) false n) revisits)
-      end
-
-    val _ = dfs [] true "start"
+    val _ = dfs [] 0 "start"
   in
     !paths
   end

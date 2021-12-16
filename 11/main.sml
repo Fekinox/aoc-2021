@@ -1,6 +1,6 @@
 val octoGrid =
   let
-    val lines = InputHelper.getInput "input"
+    val lines = InputHelper.getInput "11-1000-2.in"
 
     val processLine = (List.mapPartial (Int.fromString o Char.toString)) o String.explode
   in
@@ -36,12 +36,12 @@ end
 (* Get all indices satisfying a property *)
 fun gridFilter p B =
   let
-    val indices = List.concat(
-      List.tabulate (Array2.nRows B, (fn dr =>
-       List.tabulate (Array2.nCols B, (fn dc => (dr, dc)))))
-    )
+    val tmp = ref []
+    val _ = Array2.appi Array2.RowMajor
+      (fn (i,j,_) => if p (i,j) then tmp := (i,j)::(!tmp) else ())
+      {base=B,row=0,col=0,nrows=NONE,ncols=NONE}
   in
-    List.filter p indices
+    !tmp
   end
 
 fun octoStep B =
@@ -66,19 +66,17 @@ fun octoStep B =
         val newFlashes = gridFilter (fn (i,j) => (Array2.sub (B, i, j) > 9 andalso (not (alreadyFlashed (i, j))))) B
       in
         case newFlashes of
-           [] => []
-         | L => (List.app processFlash newFlashes; newFlashes @ (loop ()))
+           [] => 0 
+         | L => (List.app processFlash newFlashes; (List.length newFlashes) + (loop ()))
       end
 
     val flashes = loop ()
-
-    val _ = List.app reset flashes
   in
-    List.length flashes
+    flashes
   end
 
 fun flashesAfterSteps 0 B = 0
-  | flashesAfterSteps n B = (octoStep B) + (flashesAfterSteps (n-1) B)
+  | flashesAfterSteps n B = (print ("step " ^ Int.toString n ^ "\n"); (octoStep B) + (flashesAfterSteps (n-1) B))
 
 val oneHundredSteps =
   let
@@ -92,8 +90,8 @@ fun findSimultaneousFlash B =
     val numFlashes = octoStep B
   in
     if (numFlashes = (Array2.nRows B * Array2.nCols B))
-    then 1
-    else 1 + (findSimultaneousFlash B)
+    then (print "simultaneous flash!\n"; 1)
+    else (print (Int.toString numFlashes ^ " flashes\n"); 1 + (findSimultaneousFlash B))
   end
 
 val firstSimultaneousFlash =

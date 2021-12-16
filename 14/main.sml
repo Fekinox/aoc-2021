@@ -9,10 +9,10 @@ fun charPairCmp ((l1,r1),(l2,r2)) =
 fun polymerCmp ((x1,y1,_),(x2,y2,_)) = charPairCmp ((x1,y1),(x2,y2))
 
 fun insertPoly (p, poly) = 
-  (ListHelper.insert polymerCmp (fn ((x1,y1,n1),(x2,y2,n2)) => (x1,y1,n1+n2)) poly p)
+  (ListHelper.insertNoDups polymerCmp (fn ((x1,y1,n1),(x2,y2,n2)) => (x1,y1,n1+n2)) poly p)
 
 fun insertFreqCount (count, freqc) =
-  (ListHelper.insert (fn ((c1,_),(c2,_)) => Char.compare (c1,c2)) (fn ((c1,x1),(c2,x2)) => (c1,x1+x2)) freqc count)
+  (ListHelper.insertNoDups (fn ((c1,_),(c2,_)) => Char.compare (c1,c2)) (fn ((c1,x1),(c2,x2)) => (c1,x1+x2)) freqc count)
 
 val (initPolymer, initFreqCount, rules) =
   let

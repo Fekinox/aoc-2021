@@ -68,7 +68,10 @@ sig
   val quickselect : ('a * 'a -> order) -> int -> 'a list -> 'a option
   val median : ('a * 'a -> order) -> 'a list -> 'a option
 
-  val insert : ('a * 'a -> order) -> ('a * 'a -> 'a) -> 'a list -> 'a -> 'a list
+  val insertNoDups : ('a * 'a -> order) -> ('a * 'a -> 'a) -> 'a list -> 'a -> 'a list
+  val insert : ('a * 'a -> order) -> 'a list -> 'a -> 'a list
+
+  val splitAt : ('a -> bool) -> 'a list -> ('a list * 'a * 'a list) option
 end
 
 structure ListHelper : LISTHELPER =
@@ -136,10 +139,27 @@ struct
 
   fun median cmp L = quickselect cmp (List.length L div 2) L
 
-  fun insert cmp cmb [] x = [x]
-    | insert cmp cmb (y::ys) x =
+  fun insertNoDups cmp cmb [] x = [x]
+    | insertNoDups cmp cmb (y::ys) x =
     (case cmp (x,y) of
-      GREATER => y::(insert cmp cmb ys x)
+      GREATER => y::(insertNoDups cmp cmb ys x)
     | EQUAL => (cmb (x,y))::ys
     | LESS => x::y::ys)
+
+  fun insert cmp [] x = [x]
+    | insert cmp (y::ys) x =
+    (case cmp (x,y) of
+      GREATER => y::(insert cmp ys x)
+    | _ => x::y::ys)
+
+  fun splitAt p L =
+      let
+        fun splitAt' [] rest = NONE
+          | splitAt' (x::l) rest =
+            if p x
+            then SOME (List.rev rest, x, l)
+            else splitAt' l (x::rest)
+      in
+        splitAt' L []
+      end
 end

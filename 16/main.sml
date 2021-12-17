@@ -2,11 +2,11 @@ datatype packet = Literal of int * int | Operator of int * int * packet list
 
 fun takeDrop n L = 
   let
-    fun takeDrop' 0 L R = (List.rev R, L)
-      | takeDrop' n [] R = raise Fail "out of bounds"
-      | takeDrop' n (l::L) R = takeDrop' (n-1) L (l::R)
+    fun takeDrop' 0 R L = (List.rev R, L)
+      | takeDrop' n R [] = raise Fail "out of bounds"
+      | takeDrop' n R (l::L) = takeDrop' (n-1) (l::R) L
   in
-    takeDrop' n L []
+    takeDrop' n [] L
   end
 
 fun decToBin n = [(n div 8) mod 2, (n div 4) mod 2, (n div 2) mod 2, n mod 2]
@@ -20,21 +20,11 @@ fun hexToBin c =
     else decToBin((or-65)+10)
   end
 
-local
-  fun binToDecLsb ([] : int list) : int = 0
-    | binToDecLsb (b::bs) = b + 2*(binToDecLsb bs)
-in
-  val binToDec = binToDecLsb o List.rev
-end
+val binToDec = foldl (fn (b,s) => b + 2*s) 0
 
 val strToBitstring = List.concat o (map hexToBin) o String.explode
 
-val bitstring =
-  let
-    val [line] = InputHelper.getInput "input"
-  in
-    strToBitstring line
-  end
+val bitstring = (strToBitstring o hd o InputHelper.getInput) "input"
 
 fun parseLiteralNumber L =
   let
@@ -47,10 +37,8 @@ fun parseLiteralNumber L =
       in
         if isDone = 0 then (newQ, L') else loop newQ L'
       end
-
-    val (res, finalL) = loop 0 L
   in
-    (res, finalL)
+    loop 0 L
   end
 
 fun parsePacket ([] : int list) : (packet * int list) option = NONE
@@ -102,6 +90,7 @@ fun parsePacket ([] : int list) : (packet * int list) option = NONE
           end
         else
           let
+            (* Build n consecutive packets *)
             val (count, L4) = takeDrop 11 L3
             val countN = binToDec count
             val (subpacks, L5) = getPacketsCountMode L4 countN 
@@ -117,10 +106,12 @@ fun versNumberSum (Literal (v,_)) = v
   | versNumberSum (Operator (v,_,ps)) = List.foldl (fn (p,s) => s + (versNumberSum p)) v ps
 
 fun eval (Literal (_,vl)) = vl
-  | eval (Operator (_,0,a::ps)) = foldl (fn (p,q) => (eval p) + q) (eval a) ps
-  | eval (Operator (_,1,a::ps)) = foldl (fn (p,q) => (eval p) * q) (eval a) ps
-  | eval (Operator (_,2,a::ps)) = foldl (fn (p,q) => Int.min(eval p, q)) (eval a) ps
-  | eval (Operator (_,3,a::ps)) = foldl (fn (p,q) => Int.max(eval p, q)) (eval a) ps
-  | eval (Operator (_,5,[a,b])) = if (eval a) > (eval b) then 1 else 0
-  | eval (Operator (_,6,[a,b])) = if (eval a) < (eval b) then 1 else 0
-  | eval (Operator (_,7,[a,b])) = if (eval a) = (eval b) then 1 else 0
+  | eval (Operator (_,0,L)) = cmb op+ L
+  | eval (Operator (_,1,L)) = cmb op* L
+  | eval (Operator (_,2,L)) = cmb Int.min L
+  | eval (Operator (_,3,L)) = cmb Int.max L
+  | eval (Operator (_,5,L)) = cmp op> L
+  | eval (Operator (_,6,L)) = cmp op< L
+  | eval (Operator (_,7,L)) = cmp op= L
+and cmb f (a::A) = foldl (fn (p,q) => f (eval p, q)) (eval a) A
+and cmp f [a,b] = if f (eval a, eval b) then 1 else 0

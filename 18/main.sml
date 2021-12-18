@@ -53,7 +53,7 @@ fun next [] = NONE
    - It then looks for a number to split. if it finds such a number,
      it splits it and restarts.
    - If it finds neither it halts. *)
-fun reduceStep S =
+fun reduceStep S sc fc =
   let
     fun addIfSome _ NONE = ()
       | addIfSome n (SOME (Regular k)) = k := !k + n
@@ -72,44 +72,40 @@ fun reduceStep S =
 
     (* look for the leftmost explodable pair, and explode it,
        leaving the rest of the DS intact *)
-    fun tryExplode depth ancs (Regular _) = NONE
-      | tryExplode depth ancs (Pair (Regular (ref l), Regular (ref r))) =
+    fun tryExplode depth ancs (Regular _) sc fc = fc ()
+      | tryExplode depth ancs (Pair (Regular (ref l), Regular (ref r))) sc fc =
         if depth >= 4
-        then SOME (explode (l,r) ancs)
-        else NONE
-      | tryExplode depth ancs (P as Pair (p1, p2)) =
-        (case tryExplode (depth+1) ((true, P)::ancs) p1 of
-          SOME (p1') => SOME (Pair (p1', p2))
-        | NONE =>
-          (case tryExplode (depth+1) ((false,P)::ancs) p2 of
-            SOME (p2') => SOME (Pair (p1, p2'))
-          | NONE => NONE))
+        then sc (explode (l,r) ancs)
+        else fc ()
+      | tryExplode depth ancs (P as Pair (p1, p2)) sc fc =
+        tryExplode (depth+1) ((true,P)::ancs) p1
+        (fn p1' => sc (Pair (p1',p2)))
+        (fn _ =>
+          tryExplode (depth+1) ((false,P)::ancs) p2
+          (fn p2' => sc (Pair (p1,p2')))
+          fc)
 
     val tryExpRunner = tryExplode 0 []
 
-    fun trySplit (Regular (ref n)) =
+    fun trySplit (Regular (ref n)) sc fc =
       if n >= 10
-      then SOME (split n)
-      else NONE
-      | trySplit (Pair (p1,p2)) =
-        (case trySplit p1 of
-          SOME p1' => SOME (Pair (p1',p2))
-        | NONE => (case trySplit p2 of
-          SOME p2' => SOME (Pair (p1,p2'))
-        | NONE => NONE))
+      then sc (split n)
+      else fc ()
+      | trySplit (Pair (p1,p2)) sc fc =
+        trySplit p1
+        (fn p1' => sc (Pair (p1',p2)))
+        (fn _ =>
+          trySplit p2
+          (fn p2' => sc (Pair (p1,p2')))
+          fc)
   in
-    (case tryExpRunner S of
-      NONE =>
-      (case trySplit S of
-        NONE => NONE
-      | S' => S')
-    | S' => S')
+    tryExpRunner S
+    sc
+    (fn _ => trySplit S sc fc)
   end
 
 fun reduceFull S =
-  (case reduceStep S of
-    SOME S' => reduceFull S'
-  | _ => S)
+  reduceStep S (fn S' => reduceFull S') (fn _ => S)
 
 fun snailAdd (s1,s2) =
   let

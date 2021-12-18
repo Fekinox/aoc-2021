@@ -31,12 +31,12 @@ val (initX, initY) = (0,0)
 fun xPosAfterN xvel xinit n = 
   xinit + (if n >= xvel
   then xvel * (xvel + 1) div 2
-  else n * (xvel + (xvel - n + 1)) div 2)
+  else n * (2*xvel - n + 1) div 2)
 
 fun maxXPosAfterN xvel xinit = xPosAfterN xvel xinit xvel
 
 fun yPosAfterN yvel yinit n =
-  yinit + (n * (yvel + (yvel - n + 1)) div 2)
+  yinit + (n * (2*yvel - n + 1) div 2)
 
 (* at some point, we'll always come back to the point (0,0) with y-velocity
   * ~v + 1, so we want to get the highest v where ymin <= ~v - 1. the v that

@@ -55,21 +55,6 @@ val corruptedScores = ((foldl op+ 0) o (map (corrLineScore o stringErrorStatus))
 val incompleteMiddleScore = 
   let
     val incScores = List.filter (fn s => s <> 0) ((map (incLineScore o stringErrorStatus)) lines)
-
-    fun quickselect k [] = NONE
-      | quickselect k (L as (x::xs)) =
-        let
-          val (lesser, greater) = List.partition (fn i => i <= x) L
-          val (lesser, pivot) = List.partition (fn i => i < x) lesser
-          val (lessLen,pivLen) = (List.length lesser, List.length pivot)
-        in
-          (case (k < lessLen, k < lessLen + pivLen) of
-            (true, _) => quickselect k lesser
-          | (_, true) => SOME x
-          | _         => quickselect (k - lessLen - pivLen) greater)
-        end
-
-    fun median L = quickselect (List.length L div 2) L
   in
-    median incScores
+    ListHelper.median Int.compare incScores
   end

@@ -1,3 +1,12 @@
+structure PQ =
+LeftPriorityQFn(
+  type priority = int
+  fun compare (a,b) = Int.compare (b,a)
+
+  type item = ((int * int) * int)
+  fun priority (_,p) = p
+)
+
 val (riskGrid, gRows, gCols) =
   let
     val lines = InputHelper.getInput "input"
@@ -13,25 +22,12 @@ val (riskGrid, gRows, gCols) =
     (tabulated, Array2.nRows init, Array2.nCols init)
   end
 
-(* Priority queue *)
-
-fun queueInsert Q X = ListHelper.insert (fn ((_,b1),(_,b2)) => Int.compare (b1,b2)) Q X
-
-fun pqEnqueue Q (X as (x, p)) =
-  (case ListHelper.splitAt (fn (z,_) => z=x) Q of
-    (SOME (L, (_,r), R)) => queueInsert (L@R) (x,Int.min(p,r))
-  | _ => queueInsert Q X)
-
-fun pqDequeue (q::Q) = SOME (q, Q)
-  | pqDequeue _ = NONE
-
-(* Visited set *)
 fun haveVisited visited (i,j) =
   Array2.sub (visited,i,j)
 
 fun dijkstra nborfunc posPrint S T =
   let
-    val furthest = ref (0,0)
+    val furthest = ref (~1,~1)
     fun printFurthest (i,j) =
       let
         val (curI,curJ) = !furthest
@@ -43,22 +39,29 @@ fun dijkstra nborfunc posPrint S T =
 
     val visited = Array2.array (#1 T + 1, #2 T + 1, false)
 
-    fun dijk queue =
-      (case pqDequeue queue of
-        NONE => raise Fail "whoops"
-      | SOME ((position as (i,j),r),Q) =>
-        if (position = T)
-        then r
-        else 
-          (let
-            val _ = Array2.update (visited,i,j,true)
-            val nbors = List.filter (fn (p,_) => not (haveVisited visited p)) (nborfunc (position,r))
-            val newQueue = List.foldl (fn (x,q) => pqEnqueue q x) Q nbors
-          in
-            dijk newQueue
-          end))
+    fun dijk Q =
+      if (PQ.isEmpty Q)
+      then NONE
+      else
+        let
+          val ((position as (i,j),r),Q') = PQ.remove Q
+          val _ = printFurthest position
+        in
+          if (haveVisited visited position) then dijk Q'
+          else (
+          if (position = T)
+          then SOME r
+          else 
+            (let
+              val _ = Array2.update (visited,i,j,true)
+              val nbors = nborfunc (position,r)
+              val newQueue = List.foldl (fn (x : ((int * int) * int),q) => PQ.insert (x,q)) Q' nbors
+            in
+              dijk newQueue
+            end))
+        end
   in
-    dijk [S]
+    dijk (PQ.singleton ((0,0),0))
   end
 
 (* part 1: regular nbor function *)

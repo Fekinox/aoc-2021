@@ -4,6 +4,14 @@ type axisDir = axis * bool
 type vec3 = int * int * int
 type orientation = vec3 * vec3 * vec3
 type xform = orientation * vec3
+fun vectorCmp ((x1,y1,z1),(x2,y2,z2)) = List.collate Int.compare ([x1,y1,z1],[x2,y2,z2])
+
+structure Set =
+RedBlackSetFn(
+  type ord_key = vec3
+
+  val compare = vectorCmp
+)
 
 fun axisToVector (X, d) : vec3 = (if d then 1 else ~1, 0, 0)
   | axisToVector (Y, d) = (0, if d then 1 else ~1, 0)
@@ -15,17 +23,8 @@ fun upVectors (axis : axis) : (axisDir list) = List.filter (fn (a,d) => a <> axi
 fun vectorAdd (x1,y1,z1) (x2,y2,z2) = (x1+x2,y1+y2,z1+z2)
 fun vectorMul s (x,y,z) = (s*x,s*y,s*z)
 fun vectorSub (x1,y1,z1) (x2,y2,z2) = (x1-x2,y1-y2,z1-z2)
-fun vectorCmp ((x1,y1,z1),(x2,y2,z2)) = List.collate Int.compare ([x1,y1,z1],[x2,y2,z2])
 
 fun cross ((x1,y1,z1),(x2,y2,z2)) = (y1*z2 - z1*y2, z1*x2 - x1*z2, x1*y2 - y1*x2)
-
-fun overlaps cmp ([], _) = []
-  | overlaps cmp (_, []) = []
-  | overlaps cmp (l::L, r::R) =
-    (case cmp (l,r) of
-      LESS => overlaps cmp (L, r::R)
-    | GREATER => overlaps cmp (l::L, R)
-    | EQUAL => l::(overlaps cmp (L, R)))
 
 fun listPrint p L =
   let
@@ -57,9 +56,9 @@ fun combineOrients (A, (f2,u2,z2)) =
   (transformPoint A f2, transformPoint A u2, transformPoint A z2)
 
 fun rotatePoints A = map (transformPoint A)
-fun transformPoints (A, disp) = map ((vectorAdd disp) o transformPoint A)
+fun transformPoints (A, disp) = Set.map ((vectorAdd disp) o transformPoint A)
 
-val scannerList : (vec3 list) Array.array =
+val scannerList : (Set.set) Array.array =
   let
     val lines = InputHelper.getInput "input"
 
@@ -92,22 +91,24 @@ val scannerList : (vec3 list) Array.array =
           val (first, ls2) = parseScanPoint ls
           val rest = parseAll ls2
         in
-          (ListHelper.mergesort vectorCmp first)::rest
+          (Set.fromList first)::rest
         end
   in
     Array.fromList (parseAll lines)
   end
 
 (* Gets all the ways to map points in ps2 onto points in ps1 with one fixed point *)
-fun allDisplacements ps1 ps2 =
+fun allDisplacements (ps1 : Set.set) (ps2 : Set.set) =
   let
+    val (ls1,ls2) = (Set.listItems ps1, Set.listItems ps2)
+
     fun runner [] _ res = res
       (* now let's see all the ways to map points in res onto the 2nd point in l... *)
-      | runner (_::L) [] res = runner L ps2 res
+      | runner (_::L) [] res = runner L ls2 res
       (* let's add the map putting point r on point l, and then add all other such maps for rs *)
       | runner (l::L) (r::R) res = runner (l::L) R ((vectorSub l r)::res)
   in
-    runner ps1 ps2 []
+    runner ls1 ls2 []
   end
 
 (* we consider things being relative to scan1 *)
@@ -118,7 +119,7 @@ fun mostCommonPoints (scan1, scan2) =
   let
     fun translationsWithOrient A =
       let
-        val xformed = rotatePoints A scan2
+        val xformed = Set.map (transformPoint A) scan2
         val displacements = allDisplacements scan1 xformed
       in
         List.map (fn disp => (A,disp)) displacements
@@ -129,10 +130,10 @@ fun mostCommonPoints (scan1, scan2) =
     fun iterate [] = NONE
       | iterate ((orient,disp)::rest) =
         let
-          val xformedPoints = ListHelper.mergesort vectorCmp (transformPoints (orient, disp) scan2)
-          val commonPoints = overlaps vectorCmp (scan1, xformedPoints)
+          val xformedPoints = (transformPoints (orient, disp)) scan2
+          val commonPoints = Set.intersection (scan1, xformedPoints)
         in
-          if List.length commonPoints < 12
+          if Set.numItems commonPoints < 12
           then iterate rest
           else (SOME (disp, xformedPoints))
         end
@@ -143,7 +144,7 @@ fun mostCommonPoints (scan1, scan2) =
 fun beaconMap scanArray =
   let
     val count = Array.length scanArray
-    val pointArray : ((vec3 list) option) Array.array = Array.array(count, NONE)
+    val pointArray : ((Set.set) option) Array.array = Array.array(count, NONE)
     val _ = Array.update (pointArray, 0, SOME (Array.sub(scanArray, 0)))
 
     val scannerArray : (vec3 option) Array.array = Array.array(count, NONE)
@@ -151,8 +152,8 @@ fun beaconMap scanArray =
 
     val beacons = ref (Array.sub (scanArray, 0))
 
-    fun ins p = 
-      beacons := ListHelper.insertNoDups vectorCmp (fn (a,b) => a) (!beacons) p
+    fun ins S = 
+      beacons := Set.union (!beacons, S)
 
     fun getUnexplored () =
       ((List.filter (fn i => not (isSome (Array.sub (pointArray, i)))))
@@ -180,10 +181,10 @@ fun beaconMap scanArray =
             
           val newF = ref []
 
-          fun addPoint (s,d,disp,newPoints) =
+          fun addPoint (s,d,disp,newPoints : Set.set) =
             let
               val _ = print ("adding " ^ Int.toString d ^ "\n")
-              val _ = List.app ins newPoints
+              val _ = ins newPoints
               val _ = newF := d::(!newF)
               val sourcedisp = valOf (Array.sub (scannerArray, s))
               val _ = Array.update (scannerArray, d, SOME disp)

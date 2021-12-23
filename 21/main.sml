@@ -44,8 +44,6 @@ fun dirac (p1Pos, p2Pos) =
 
     fun runner dice p1Turn =
       let
-        val _ = print ("position " ^ Int.toString (!p1pos) ^ " " ^ Int.toString (!p2pos) ^ "\n")
-        val _ = print ("score    " ^ Int.toString (!p1score) ^ " " ^ Int.toString (!p2score) ^ "\n\n")
         val (roll, d1) = DetDice.rollN (dice, 3)
         val newDistance = foldl op+ 0 roll
         val _ = rolls := (!rolls) + 3
@@ -82,10 +80,12 @@ fun dirac (p1Pos, p2Pos) =
 fun realDirac scoreLimit positions (p1Start, p2Start) =
   let
     (* trinomials yuck *)
-    val diracRolls = Vector.map Int.toLarge (Vector.fromList [1,3,6,7,6,3,1])
+    val diracRolls =
+      Vector.map Int.toLarge (Vector.fromList [1,3,6,7,6,3,1])
 
     (* Maintain a cache indexed by the following data:
-       pos1, pos2: position of current player, position of other player
+       pos1, pos2: position of current player,
+                   position of other player
        score1, score2: score of current, score of other
        turn: current player to move: 0 for p1, 1 for p2 *)
     fun freshCache () = Array.array (positions*positions*scoreLimit*scoreLimit*2, Int.toLarge 0)
